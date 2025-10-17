@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: n8npassword
+      POSTGRES_DB: n8n
+    ports:
+      - "5432:5432"
+    networks:
+      - ai_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    env_file:
+      - .env
+    build: .
+    container_name: n8n
+    networks:
+      - ai_net
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-custom-nodes:/home/node/.n8n/custom
+      - n8n_data:/home/node/.n8n
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8npassword
+      - EXECUTIONS_DB_TYPE=postgresdb
+      - EXECUTIONS_DB_POSTGRESDB_HOST=postgres
+      - EXECUTIONS_DB_POSTGRESDB_DATABASE=n8n
+      - EXECUTIONS_DB_POSTGRESDB_USER=n8n
+      - EXECUTIONS_DB_POSTGRESDB_PASSWORD=n8npassword
+      - NODE_FUNCTION_ALLOW_EXTERNAL=*
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_PORT=5678
+      - WEBHOOK_URL=https://vkfppmnkka.a.pinggy.link/
+      - N8N_HOST=vkfppmnkka.a.pinggy.link
+      - N8N_PROTOCOL=https
+      - N8N_PROXY_HOPS=1
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=true
+      - OLLAMA_HOST=http://localhost:11434
+      - N8N_BLOCK_ENV_ACCESS_IN_NODES=true
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      - N8N_LOG_LEVEL=debug
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    ports:
+      - "11434:11434"
+    container_name: ollama
+    networks:
+      - ai_net
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  pinggy:
+    image: pinggy/pinggy
+    ports:
+      - "4300:4300"
+    stdin_open: true     # equivalent to -i
+    tty: true            # equivalent to -t
+    command:
+      - "-p"
+      - "443"
+      - "-R0:localhost:80"
+      - "-R vkfppmnkka.a.pinggy.link:0:localhost:5678"
+      - "-L0.0.0.0:4300:localhost:4300"
+      - "-o"
+      - "StrictHostKeyChecking=no"
+      - "-o"
+      - "ServerAliveInterval=30"
+      - "${PINGGY_TOKEN}aa@pro.pinggy.io"
+
+  frontend:
+    build:
+      context: ./frontend # Specify the path to your React app directory
+      dockerfile: ../FrontendDockerfile
+    ports:
+      - "80:80" # Map host port 80 to container port 80
+    volumes:
+      - ./frontend:/app # Optional: for development, mount the source code
+      - /app/node_modules # Exclude node_modules from the mounted volume
+
+networks:
+  ai_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n-custom-nodes:
+  n8n_data:
+  ollama_data:
